@@ -89,9 +89,7 @@ class QuickMenu(PreferencesBridge):
 
         # rebuild boards file automatically
         if(boards == []):
-            from ..beginning.install_pio import save_board_list
-
-            save_board_list()
+            deviot.save_board_list()
 
             boards_file = File(boards_path)
             boards = boards_file.read_json()

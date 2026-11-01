@@ -10,6 +10,8 @@ from ..api import deviot
 from ..libraries.messages import Messages
 from ..libraries.thread_progress import ThreadProgress
 
+PIP = ['"%s"' % deviot.PYTHON_PATH, '-m', 'pip']
+
 
 class DeviotCheckPioUpdatesCommand(sublime_plugin.WindowCommand):
     def run(self):
@@ -40,7 +42,6 @@ class Update:
 
         self.cwd = None
         self.dprint = None
-        self.env_paths = deviot.get_sysetting('env_paths', False)
 
     def show_feedback(self):
         messages = Messages()
@@ -93,7 +94,7 @@ class Update:
         self.show_feedback()
         self.dprint('uninstall_old_pio')
 
-        cmd = ['pip', 'uninstall', '--yes', 'platformio']
+        cmd = PIP + ['uninstall', '--yes', 'platformio']
         out = deviot.run_command(cmd)
 
         developer = deviot.get_sysetting('pio_developer', False)
@@ -106,7 +107,7 @@ class Update:
             self.dprint('installing_stable_pio')
             option = 'platformio'
 
-        cmd = deviot.prepare_command(['pip', 'install', '-U', option])
+        cmd = PIP + ['install', '-U', option]
         out = deviot.run_command(cmd)
 
         if(out[0] == 0):
@@ -133,10 +134,6 @@ class Update:
         To know what is the last version of platformio
         pypi is checked
         """
-        installed = deviot.get_sysetting('installed', False)
-        if(not installed):
-            return
-
         from datetime import datetime, timedelta
 
         date_now = datetime.now()
@@ -155,7 +152,10 @@ class Update:
             deviot.save_sysetting('last_check_update', str(last_check))
 
         cmd = deviot.pio_command(['--version'])
-        out = deviot.run_command(cmd, env_paths=self.env_paths)
+        out = deviot.run_command(cmd)
+
+        if(out[0] != 0):
+            return
 
         pio_version = int(sub(r'\D', '', out[1]))
         last_pio_version = self.online_pio_version()

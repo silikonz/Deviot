@@ -6,16 +6,17 @@ import inspect
 
 from glob import glob
 from os import path, getenv, environ, makedirs, chmod
-from collections import OrderedDict
 
 handler = logging.StreamHandler(sys.stdout)
 logger = None
 
 _cache = '.cache'
-_install_name = 'penv'
-_virtualenv_name = 'virtualenv'
-VIRTUALENV_URL = 'https://pypi.python.org/packages/source/v/' \
-    'virtualenv/virtualenv-16.0.0.tar.gz'
+
+# PlatformIO is not installed by Deviot, set where to find it:
+# PIO_PATH is the `pio` executable, PYTHON_PATH the python used to run pip
+# (updates). Both can be a full path or a name found in PATH.
+PIO_PATH = 'pio'
+PYTHON_PATH = 'python3'
 
 
 def create_logger(name):
@@ -222,54 +223,12 @@ def system_ini_path():
     return path.join(user_plugin, 'deviot.ini')
 
 
-def dependencies_path():
-    """
-    Path to Packages/User/Deviot/penv
-    """
-    deviot = user_plugin_path()
-    return path.join(deviot, _install_name)
-
-
-def bin_name():
-    """
-    Name of the bin folder based on the O.S
-    """
-    bin = 'bin'
-    if('windows' in sublime.platform()):
-        bin = 'Scripts'
-    return bin
-
-
-def bin_path():
-    """
-    Path to Packages/User/Deviot/penv/bin|Scripts
-    """
-    dependencies = dependencies_path()
-    return path.join(dependencies, bin_name())
-
-
-def pio_penv():
-    """
-    Path to ~/.platformio/penv/bin
-    """
-    user_path = path.expanduser('~')
-    return path.join(user_path, '.platformio', 'penv', bin_name())
-
-
 def setting_path():
     """
     Path to Packages/User/Deviot/deviot.ini
     """
     plugin = user_plugin_path()
     return path.join(plugin, 'deviot.ini')
-
-
-def virtualenv_path():
-    """
-    Path to Packages/User/Deviot/penv/virtualenv
-    """
-    dependencies = dependencies_path()
-    return path.join(dependencies, _virtualenv_name)
 
 
 def user_pio_path():
@@ -323,30 +282,6 @@ def libraries_data_path():
     """
     user_data = user_pio_path()
     return path.join(user_data, 'libraries.json')
-
-
-def virtualenv_list():
-    """
-    List of elements in VIRTUALENV_URL
-    """
-    return VIRTUALENV_URL.split('/')
-
-
-def virtualenv_name():
-    """
-    Name of the virtualenv folder
-    """
-    url_list = virtualenv_list()
-    list_number = len(url_list)
-    return url_list[list_number - 1]
-
-
-def virtualenv_file():
-    """
-    Path to Packages/User/Deviot/.cache/virtualenv
-    """
-    cache = cache_path()
-    return path.join(cache, virtualenv_name())
 
 
 def get_sysetting(key, default=None):
@@ -405,51 +340,20 @@ def save_sysetting(key, value):
         config.write(configfile)
 
 
-def prepare_command(command):
-    """
-    Edit the command depending of the O.S of the user
-    """
-    bin_dir = bin_path()
-    platform = sublime.platform()
-    deviot_bin = get_sysetting('deviot_bin', False)
-    env_paths = get_sysetting('env_path', False)
-    symlink = get_sysetting('symlink', 'python')
-
-    if(not path.exists(bin_dir) or bool(deviot_bin) or
-       not env_paths and platform == 'windows'):
-        return command
-
-    if(platform == 'osx'):
-        exe = symlink
-        options = ['-m', command[0]]
-    else:
-        exe = command[0]
-        options = []
-
-    executable = path.join(bin_dir, exe)
-
-    cmd = ['"%s"' % (executable)]
-    cmd.extend(options)
-    cmd.extend(command[1:])
-
-    return cmd
-
-
 def pio_command(options, verbose=False):
     """
     Completes PlatformIO command
     """
-    cmd = " ".join(options)
-    command = prepare_command(['platformio', '-f', '-c', 'sublimetext'])
+    command = ['"%s"' % PIO_PATH, '-f', '-c', 'sublimetext']
     command.extend(options)
 
     # verbose mode
-    if(verbose and 'run' in cmd and '-e' in cmd):
-        command.extend(['-v'])
+    if(verbose and 'run' in options and '-e' in options):
+        command.append('-v')
     return command
 
 
-def run_command(command, cwd=None, env_paths=False):
+def run_command(command, cwd=None):
     '''Commands
 
     Run all the commands to install the plugin
@@ -459,18 +363,11 @@ def run_command(command, cwd=None, env_paths=False):
 
     Keyword Arguments:
         cwd {str} -- current working dir (default: None)
-        prepare_cmd {bool} -- when is true the platformIO command will
-                          be updated to be multi-platform compatible
-                          (default: False)
 
     Returns:
         [list] -- list[0]: return code list[1]: command output
     '''
     import subprocess
-
-    # defining default env paths
-    if(env_paths):
-        environ['PATH'] = env_paths
 
     command.append("2>&1")
     command = ' '.join(command)
@@ -484,71 +381,6 @@ def run_command(command, cwd=None, env_paths=False):
     return_code = process.returncode
 
     return (return_code, stdout)
-
-
-def environment_paths():
-    '''Environment
-
-    All the necessary environment paths are merged to run platformIO
-    correctly
-
-    Returns:
-        [list] -- paths in a list
-    '''
-    # default paths
-    default = default_paths()
-    system = environ.get("PATH", "").split(path.pathsep)
-
-    env_paths = []
-    env_paths.extend(default)
-    env_paths.extend(system)
-
-    env_paths = list(OrderedDict.fromkeys(env_paths))
-    env_paths = path.pathsep.join(env_paths)
-
-    return env_paths
-
-
-def default_paths():
-    """Python Paths
-
-    Folder where python should be installed in the diferents os
-
-    Returns:
-        list -- paths corresponding to the os
-    """
-    if(sublime.platform() == 'windows'):
-        default_paths = ["C:\\Python27", "C:\\Python27\\Scripts"]
-    else:
-        user_bin_path = path.join(path.expanduser('~'), '.local', 'bin')
-        default_paths = ["/usr/bin", "/usr/local/bin", user_bin_path]
-
-    # possible old installation in /Packages/User/Deviot
-    default_paths.append(bin_path())
-
-    # instalation from atom or MS VS
-    default_paths.append(pio_penv())
-
-    # get path from python.txt in Packages/User/Deviot
-    packages = packages_path()
-    deviot_path = path.join(packages, 'User', 'Deviot')
-    extra_python = path.join(deviot_path, 'python.txt')
-
-    if(path.exists(extra_python)):
-        with open(extra_python) as file:
-            for line in file:
-                line = line.strip()
-                new_path = path.normpath(line)
-                default_paths.append(new_path)
-
-    temp_path = default_paths
-    default_paths = []
-
-    for tpath in temp_path:
-        if(path.exists(tpath)):
-            default_paths.append(tpath)
-
-    return default_paths
 
 
 def listWinVolume():
@@ -691,3 +523,17 @@ def folder_explorer(pathstr=None, callback=None, key=None, plist=None, index=-2)
         lambda: quick_panel(
             paths_list, lambda index: folder_explorer(
                 pathstr, callback, key, paths_list, index)), 0)
+
+
+def save_board_list():
+    """
+    Stores the output of `pio boards --json-output` in
+    Packages/User/Deviot/pio/boards.json
+    """
+    from ..libraries.file import File
+
+    code, boards = run_command(pio_command(['boards', '--json-output']))
+
+    if(code == 0):
+        create_dirs(user_pio_path())
+        File(boards_file_path()).write(boards)

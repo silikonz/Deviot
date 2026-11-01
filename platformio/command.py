@@ -35,7 +35,8 @@ from functools import partial
 from collections import deque
 
 from ..libraries import messages
-from ..libraries.tools import prepare_command, get_setting, get_sysetting
+from ..api import deviot
+from ..libraries.tools import get_setting
 from ..libraries.thread_progress import ThreadProgress
 from .project_recognition import ProjectRecognition
 
@@ -148,11 +149,6 @@ class Command(ProjectRecognition):
         self.errs_by_file = {}
         self.window = sublime.active_window()
 
-        # sets environment
-        env_path = get_sysetting('env_path', False)
-        if(env_path):
-            os.environ['PATH'] = env_path
-
         global _COMMAND_QUEUE
         global _BUSY
 
@@ -179,7 +175,7 @@ class Command(ProjectRecognition):
         self.show_errors_inline = get_setting('show_errors_inline', True)
 
         verbose = get_setting('verbose_output', False)
-        cmd = prepare_command(cmd, verbose)
+        cmd = " ".join(deviot.pio_command(cmd, verbose) + ['2>&1'])
 
         if(self.cwd):
             os.chdir(self.cwd)

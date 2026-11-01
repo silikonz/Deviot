@@ -9,6 +9,7 @@ from __future__ import unicode_literals
 import os
 from glob import glob
 
+from ..api import deviot
 from ..libraries.file import File
 from ..libraries.tools import get_setting
 from .command import Command
@@ -29,11 +30,10 @@ class PioBridge(Command):
         from threading import Thread
         from ..libraries.thread_progress import ThreadProgress
         from ..libraries.I18n import I18n
-        from ..beginning.install_pio import save_board_list
 
         txt = I18n().translate('processing')
 
-        thread = Thread(target=save_board_list)
+        thread = Thread(target=deviot.save_board_list)
         thread.start()
         ThreadProgress(thread, txt, '')
 

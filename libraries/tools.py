@@ -7,9 +7,8 @@ from __future__ import division
 from __future__ import unicode_literals
 
 from re import search
-from shutil import rmtree
-from os import environ, path, makedirs, getenv, remove
-from sublime import load_settings, save_settings, platform, version, active_window, windows, Region, LAYOUT_BELOW
+from os import path, makedirs, getenv, remove
+from sublime import load_settings, save_settings, version, active_window, windows, Region, LAYOUT_BELOW
 
 from ..api import deviot
 
@@ -28,50 +27,6 @@ def accepted_extensions():
     return accepted
 
 
-def get_env_paths():
-    '''
-    All the necessary environment paths are merged to run platformIO
-    '''
-
-    from collections import OrderedDict
-
-    # default paths
-    if(platform() == 'windows'):
-        default_paths = ["C:\\Python27\\", "C:\\Python27\\Scripts"]
-    else:
-        default_paths = ["/usr/bin", "/usr/local/bin"]
-
-    system_paths = environ.get("PATH", "").split(path.pathsep)
-
-    env_paths = []
-    env_paths.extend(default_paths)
-    env_paths.extend(system_paths)
-
-    env_paths = list(OrderedDict.fromkeys(env_paths))
-    env_paths = path.pathsep.join(env_paths)
-
-    return env_paths
-
-
-def save_env_paths(new_path):
-    '''
-    After install all the necessary dependencies to run the plugin,
-    the environment paths are stored in the preferences file
-    '''
-    from collections import OrderedDict
-
-    env_paths = get_env_paths().split(path.pathsep)
-
-    paths = []
-    paths.extend(new_path)
-    paths.extend(env_paths)
-
-    paths = list(OrderedDict.fromkeys(paths))
-    paths = path.pathsep.join(paths)
-
-    save_setting('env_path', paths)
-
-
 def get_headers():
     """
     headers for urllib request
@@ -80,48 +35,6 @@ def get_headers():
     user_agent = 'Deviot-IDE/%s (Sublime-Text/%s)' % (deviot.version(), version())
     headers = {'User-Agent': user_agent}
     return headers
-
-
-def create_command(command):
-    """
-    Edit the command depending of the O.S of the user
-    """
-    external_bins = get_sysetting('external_bins', False)
-    env_path = get_sysetting('env_path', False)
-    symlink = get_sysetting('symlink', False)
-
-    if(not env_path or bool(external_bins)):
-        return command
-
-    if(platform() == 'osx'):
-        exe = 'python' if(not bool(symlink)) else 'python2'
-        options = ['-m', command[0]]
-    else:
-        exe = command[0]
-        options = []
-
-    bin_dir = deviot.bin_path()
-    executable = path.join(bin_dir, exe)
-
-    cmd = ['"%s"' % (executable)]
-    cmd.extend(options)
-    cmd.extend(command[1:])
-
-    return cmd
-
-
-def prepare_command(options, verbose):
-    cmd = " ".join(options)
-    command = create_command(['platformio', '-f', '-c', 'sublimetext'])
-    command.extend(options)
-
-    # verbose mode
-    if(verbose and 'run' in cmd and '-e' in cmd):
-        command.extend(['-v'])
-
-    command.append("2>&1")
-
-    return " ".join(command)
 
 
 def get_sysetting(key, default=None):
@@ -210,7 +123,6 @@ def remove_settings():
     """
     plugin_path = deviot.plugin_path()
     packages_path = deviot.packages_path()
-    deviot_penv = deviot.dependencies_path()
 
     deviot_menu = path.join(plugin_path, 'Main.sublime-menu')
     deviot_context = path.join(plugin_path, 'Context.sublime-menu')
@@ -218,15 +130,10 @@ def remove_settings():
     deviot_settings = path.join(packages_path, 'User', 'deviot.sublime-settings')
 
     files = [deviot_menu, deviot_context, deviot_commands, deviot_settings]
-    folders = [deviot_penv]
 
     for file in files:
         if(path.exists(file)):
             remove(file)
-
-    for folder in folders:
-        if(path.exists(folder)):
-            rmtree(folder, ignore_errors=True)
 
     from .I18n import I18n
     from sublime import message_dialog
