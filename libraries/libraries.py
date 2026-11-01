@@ -94,20 +94,21 @@ class Libraries(Command):
                 Keyword to search the library in the platformio API
         """
         request = {}
-        request['query'] = self.keyword
+        request['query'] = 'type:library {0}'.format(self.keyword).strip()
         request['page'] = self.page
         query = urlencode(request)
 
-        url = 'http://api.platformio.org/lib/search?{0}'.format(query)
+        url = 'https://api.registry.platformio.org/v3/search?{0}'.format(query)
         req = Request(url, headers=get_headers())
 
         response = urlopen(req)
         response_list = loads(response.read().decode())
 
-        pages = response_list['total'] / response_list['perpage']
+        pages = response_list['total'] / response_list['limit']
         page_previous = self.page - 1
         page_next = self.page + 1
 
+        self.quick_list = []
         if(len(response_list['items']) == 0):
             self.quick_list.append([self.translate('none_lib_found')])
         else:
@@ -144,6 +145,11 @@ class Libraries(Command):
                 authornames = ", ".join(item['authornames'])
             except KeyError:
                 authornames = ""
+
+            owner = item.get('owner', {}).get('username')
+            if owner:
+                authornames = owner
+                id = '{0}/{1}'.format(owner, name)
 
             info = "{0} | {1}".format(name, authornames)
             quick_list.append([info, description, id])
