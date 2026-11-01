@@ -6,7 +6,7 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import unicode_literals
 
-from sublime import active_window
+from sublime import active_window, error_message, set_timeout
 from os import path
 from json import loads
 from glob import glob
@@ -14,6 +14,7 @@ from threading import Thread
 from urllib.parse import urlencode
 from urllib.request import Request
 from urllib.request import urlopen
+from urllib.error import URLError
 
 from ..api import deviot
 from .file import File
@@ -96,15 +97,20 @@ class Libraries(Command):
         request = {}
         request['query'] = 'type:library {0}'.format(self.keyword).strip()
         request['page'] = self.page
+        request['limit'] = 10
         query = urlencode(request)
 
         url = 'https://api.registry.platformio.org/v3/search?{0}'.format(query)
         req = Request(url, headers=get_headers())
 
-        response = urlopen(req)
-        response_list = loads(response.read().decode())
-
-        pages = response_list['total'] / response_list['limit']
+        try:
+            with urlopen(req, timeout=20) as response:
+                response_list = loads(response.read().decode())
+            pages = response_list['total'] / response_list['limit']
+        except (URLError, OSError, ValueError, KeyError, TypeError) as exc:
+            message = 'Deviot library search: {0}'.format(exc)
+            set_timeout(lambda: error_message(message), 0)
+            return
         page_previous = self.page - 1
         page_next = self.page + 1
 
@@ -123,7 +129,9 @@ class Libraries(Command):
                 caption = self.translate("library_page_next_{0}", page_next)
                 self.quick_list.insert(len(self.quick_list), [caption, page_next])
         
-        quick_panel(self.quick_list, self.library_install_async)
+        items = [[str(row[0]), str(row[1]) if len(row) > 1 else '']
+                 for row in self.quick_list]
+        set_timeout(lambda: quick_panel(items, self.library_install_async), 0)
 
     def quicked(self, source_list):
         """Quick panel List
