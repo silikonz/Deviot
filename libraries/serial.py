@@ -19,25 +19,11 @@ from . import status_color
 
 
 def serial_port_list():
-    """List of Ports
-
-    Return the list of serial ports availables on the system.
-
-    Returns:
-        [list/list] -- list of list like [['port1 fullname',
-                       port_name]['port2 fullname', 'port_name']]
-    """
-    ports = list(list_ports.comports())
-    dev_names = ['ttyACM', 'ttyUSB', 'tty.', 'cu.']
-    serial_ports = []
-    for port_no, description, address in ports:
-        for dev_name in dev_names:
-            if(address != 'n/a' and dev_name in port_no
-                    or platform() == 'windows'):
-                serial_ports.append([description, address, port_no])
-                break
-
-    return serial_ports
+    return [
+        [description, hardware_id, device]
+        for device, description, hardware_id
+        in list_ports.comports()
+    ]
 
 
 serials_in_use = []
